@@ -8,7 +8,7 @@ void printGraph(Graph* graph);
 int main() {
     printf("Attempting to load road network...\n");
 
-    Graph* dehradun_map = loadGraphFromFile("map.txt", NUM_LOCATIONS);
+    Graph* dehradun_map = loadGraphFromFile("engine/data/map.txt", NUM_LOCATIONS);
 
     if (dehradun_map == NULL) {
         fprintf(stderr, "Error: Failed to create the graph from file.\n");
