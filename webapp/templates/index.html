@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Real-Time Traffic Optimizer</title>
+</head>
+<body>
+    <h1>Real-Time Traffic Flow Optimizer</h1>
+
+    <form method="POST">
+        <label for="source">Source:</label>
+        <input type="text" id="source" name="source" placeholder="Enter starting junction" required>
+        <br><br>
+        <label for="destination">Destination:</label>
+        <input type="text" id="destination" name="destination" placeholder="Enter destination junction" required>
+        <br><br>
+        <button type="submit">Find Route</button>
+    </form>
+
+    {% if result %}
+        <h2>Result:</h2>
+        <div id="result-output">
+            <p>{{ result }}</p>
+        </div>
+    {% endif %}
+
+</body>
+</html>
