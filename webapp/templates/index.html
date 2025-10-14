@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF--8">
+    <title>Real-Time Traffic Optimizer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* CSS styling remains the same as before */
+        body { font-family: 'Poppins', sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; display: flex; flex-direction: column; height: 100vh; }
+        header { background-color: #ffffff; color: #333; text-align: center; padding: 15px; font-size: 1.5em; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 1000; }
+        .container { display: flex; flex-grow: 1; }
+        .sidebar { width: 350px; background-color: #ffffff; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        .sidebar h2 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; font-size: 1.2em; }
+        .info-box { background-color: #e9f5ff; border-left: 5px solid #1a73e8; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+        .result-item, .control-item { font-size: 1.1em; margin-bottom: 15px; }
+        select { width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-family: 'Poppins', sans-serif;}
+        #clear-btn { margin-top: auto; padding: 12px; font-size: 1em; font-weight: 500; background-color: #d93025; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s ease; }
+        #clear-btn:hover { background-color: #c5221f; }
+        #map { flex-grow: 1; height: 100%; }
+    </style>
+</head>
+<body>
+    <header>Real-Time Traffic Flow Optimizer 🚗</header>
+
+    <div class="container">
+        <aside class="sidebar">
+            <h2>🚦 Controls & Info</h2>
+            <div class="info-box" id="instructions">Select a starting point and destination from the dropdowns below.</div>
+            
+            <div class="control-item">
+                <label for="start-select"><strong>📍 Start:</strong></label>
+                <select id="start-select"><option value="">Choose a starting point...</option></select>
+            </div>
+            <div class="control-item">
+                <label for="end-select"><strong>🏁 End:</strong></label>
+                <select id="end-select"><option value="">Choose a destination...</option></select>
+            </div>
+            
+            <hr>
+            
+            <div class="result-item"><strong>⏱️ Total Time:</strong> <span id="total-time">---</span></div>
+            <div class="result-item"><strong>🗺️ Distance:</strong> <span id="total-distance">---</span></div>
+            <button id="clear-btn">Clear Route</button>
+        </aside>
+        <main id="map"></main>
+    </div>
+
+    <script>
+        // --- 1. SETUP ---
+        const map = L.map('map').setView([30.325, 78.025], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        let startMarker = null;
+        let endMarker = null;
+        let routeLine = null;
+
+        // UI Elements
+        const instructions = document.getElementById('instructions');
+        const startSelect = document.getElementById('start-select');
+        const endSelect = document.getElementById('end-select');
+        const totalTimeEl = document.getElementById('total-time');
+        const totalDistanceEl = document.getElementById('total-distance');
+        const clearBtn = document.getElementById('clear-btn');
+        
+        // **NEW:** We now have different types of locations
+        const locations = {
+            1: { lat: 30.3249, lon: 78.0343, name: 'Ghanta Ghar', type: 'junction' },
+            2: { lat: 30.2858, lon: 77.9961, name: 'ISBT', type: 'junction' },
+            3: { lat: 30.3664, lon: 78.0528, name: 'Pacific Mall', type: 'mall' },
+            4: { lat: 30.3435, lon: 78.0061, name: 'FRI', type: 'junction' },
+            5: { lat: 30.3348, lon: 77.9935, name: 'Prem Nagar', type: 'junction' },
+            6: { lat: 30.2711, lon: 78.0543, name: 'Doon University', type: 'junction' },
+            7: { lat: 30.3256, lon: 78.0684, name: 'Sahastradhara Crossing', type: 'junction' },
+            // Visual markers only, not used for routing
+            101: { lat: 30.3283, lon: 78.0468, name: 'Max Hospital', type: 'hospital' },
+            102: { lat: 30.3211, lon: 78.0300, name: 'Dehradun Railway Station', type: 'transport' }
+        };
+
+        // --- 2. POPULATE UI & MAP ---
+        
+        // Create custom icons
+        const icons = {
+            junction: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
+            hospital: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
+            mall: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
+            transport: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-black.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] })
+        };
+
+        for (const id in locations) {
+            const loc = locations[id];
+            
+            // Add all locations as visual markers on the map
+            L.marker([loc.lat, loc.lon], { icon: icons[loc.type] || icons.junction })
+                .addTo(map)
+                .bindPopup(`<b>${loc.name}</b>`);
+            
+            // **Only add 'junctions' to the dropdowns for routing**
+            if (loc.type === 'junction') {
+                startSelect.innerHTML += `<option value="${id}">${loc.name}</option>`;
+                endSelect.innerHTML += `<option value="${id}">${loc.name}</option>`;
+            }
+        }
+        
+        // --- 3. HANDLE SELECTIONS ---
+        startSelect.addEventListener('change', handleSelection);
+        endSelect.addEventListener('change', handleSelection);
+        clearBtn.addEventListener('click', clearRoute);
+
+        function handleSelection() {
+            const startId = startSelect.value;
+            const endId = endSelect.value;
+
+            // Remove old markers
+            if (startMarker) map.removeLayer(startMarker);
+            if (endMarker) map.removeLayer(endMarker);
+
+            if (startId) {
+                const startLoc = locations[startId];
+                startMarker = L.marker([startLoc.lat, startLoc.lon]).addTo(map);
+            }
+            if (endId) {
+                const endLoc = locations[endId];
+                endMarker = L.marker([endLoc.lat, endLoc.lon]).addTo(map);
+            }
+
+            if (startId && endId && startId !== endId) {
+                instructions.innerHTML = 'Calculating route...';
+                findAndDrawRoute(startId, endId);
+            }
+        }
+
+        function clearRoute() {
+            if (startMarker) map.removeLayer(startMarker);
+            if (endMarker) map.removeLayer(endMarker);
+            if (routeLine) map.removeLayer(routeLine);
+            startMarker = null;
+            endMarker = null;
+            routeLine = null;
+            startSelect.value = "";
+            endSelect.value = "";
+            instructions.textContent = 'Select a starting point and destination from the dropdowns below.';
+            totalTimeEl.textContent = '---';
+            totalDistanceEl.textContent = '---';
+        }
+
+        // --- 4. COMMUNICATE WITH SERVER ---
+        async function findAndDrawRoute(startId, endId) {
+            const response = await fetch('/find_route', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ start: startId, end: endId })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                instructions.textContent = `Error: ${errorData.error}`;
+                return;
+            }
+
+            const routeCoordinates = await response.json();
+
+            if (routeCoordinates && routeCoordinates.length > 0) {
+                if (routeLine) map.removeLayer(routeLine);
+                routeLine = L.polyline(routeCoordinates, { color: '#00bfa5', weight: 5 }).addTo(map);
+                map.fitBounds(routeLine.getBounds());
+
+                let distance = 0;
+                for (let i = 0; i < routeCoordinates.length - 1; i++) {
+                    distance += L.latLng(routeCoordinates[i]).distanceTo(L.latLng(routeCoordinates[i+1]));
+                }
+                
+                totalTimeEl.textContent = `~${(distance / 1000 * 2.5).toFixed(0)} minutes (estimated)`;
+                totalDistanceEl.textContent = `${(distance / 1000).toFixed(2)} km`;
+                instructions.textContent = 'Route found! Use the "Clear Route" button to start over.';
+            } else {
+                instructions.textContent = 'No route found between these points.';
+            }
+        }
+    </script>
+</body>
+</html>
