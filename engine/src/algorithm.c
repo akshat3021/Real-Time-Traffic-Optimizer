@@ -87,6 +87,7 @@ PathResult* dijkstra(Graph* graph, int src, int dest) {
     int parent[V];
     MinHeap* minHeap = createMinHeap(V);
 
+    // Initialize distances and parent array
     for (int v = 0; v < V; ++v) {
         dist[v] = INT_MAX;
         parent[v] = -1;
@@ -98,6 +99,7 @@ PathResult* dijkstra(Graph* graph, int src, int dest) {
     decreaseKey(minHeap, src, dist[src]);
     minHeap->size = V;
 
+    // Dijkstra's algorithm loop
     while (!isEmpty(minHeap)) {
         MinHeapNode* minHeapNode = extractMin(minHeap);
         int u = minHeapNode->v;
@@ -114,6 +116,13 @@ PathResult* dijkstra(Graph* graph, int src, int dest) {
         }
     }
 
+    // Debug: Print the distances and parent array to check if the path was found
+    printf("\n--- Dijkstra's Result ---\n");
+    for (int i = 0; i < V; ++i) {
+        printf("Node %d: Distance = %.2f, Parent = %d\n", i + 1, dist[i], parent[i]);
+    }
+
+    // If destination is not reachable, return an empty path
     PathResult* result = (PathResult*)malloc(sizeof(PathResult));
     if (dist[dest] == INT_MAX) {
         result->path = NULL;
@@ -122,6 +131,7 @@ PathResult* dijkstra(Graph* graph, int src, int dest) {
         return result;
     }
 
+    // Reconstruct the path from destination to source
     int path_len = 0;
     int temp_path[V];
     int current = dest;
@@ -138,7 +148,7 @@ PathResult* dijkstra(Graph* graph, int src, int dest) {
     }
 
     free(minHeap->pos);
-    for(int i = 0; i < V; ++i) free(minHeap->array[i]);
+    for (int i = 0; i < V; ++i) free(minHeap->array[i]);
     free(minHeap->array);
     free(minHeap);
 
