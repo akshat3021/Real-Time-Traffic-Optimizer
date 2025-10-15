@@ -3,57 +3,71 @@
 #include "graph.h"
 #include "algorithm.h"
 
-// Placeholder for traffic simulation (Module 3's other responsibility)
+// Placeholder for traffic simulation (you can extend this later)
 void simulate_traffic(Graph* graph) {
-    // In the future, this function can randomly increase the weight of some edges
+    // For now, no traffic updates, just a placeholder
     printf("Note: Traffic simulation not yet implemented.\n");
 }
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
-        printf("Usage: %s <source_id> <destination_id>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <source_id> <destination_id>\n", argv[0]);
         return 1;
     }
 
     int src_id = atoi(argv[1]);
     int dest_id = atoi(argv[2]);
 
-    // --- Step 1: Load the graph (Module 1) ---
-    Graph* graph = load_graph("engine/junctions.csv", "engine/edges.csv");
-    if (graph == NULL) {
-        return 1; // Error loading graph
+    if (src_id <= 0 || dest_id <= 0) {
+        fprintf(stderr, "Source and destination IDs must be positive integers.\n");
+        return 1;
     }
 
-    // --- (Optional) Print graph for debugging ---
-    // print_graph(graph);
+    // Load graph (Module 1)
+    Graph* graph = load_graph("junctions.csv", "edges.csv");
+    if (graph == NULL) {
+        fprintf(stderr, "Error loading graph data.\n");
+        return 1;
+    }
 
-    // --- Step 2: Simulate traffic ---
+    printf("Graph loaded successfully with %d junctions.\n", graph->num_nodes);
+
+    // Print the graph adjacency for debugging
+    print_graph(graph);
+
+    // Simulate traffic (update edge weights if needed)
     simulate_traffic(graph);
 
-    // --- Step 3: Find shortest path (Module 2) ---
-    // Note: We use ID - 1 because arrays are 0-indexed
+    // Find shortest path (Module 2)
     PathResult* result = dijkstra(graph, src_id - 1, dest_id - 1);
 
-    // --- Step 4: Format and print the output for the website ---
-    if (result != NULL && result->path != NULL) {
-        printf("["); // Start of JSON array
-        for (int i = 0; i < result->length; i++) {
-            int node_index = result->path[i];
-            printf("[%lf,%lf]", graph->nodes[node_index].latitude, graph->nodes[node_index].longitude);
-            if (i < result->length - 1) {
-                printf(","); // Comma between coordinate pairs
-            }
-        }
-        printf("]"); // End of JSON array
-    } else {
-        printf("[]"); // Print empty array if no path is found
+    // Debug: Check if the path result is valid
+    if (result == NULL) {
+        fprintf(stderr, "Error: Dijkstra algorithm failed.\n");
+        free_graph(graph);
+        return 1;
     }
 
-    // --- Step 5: Clean up memory ---
-    if (result != NULL) {
-        free(result->path);
-        free(result);
+    // Debug: Print the path length and total weight
+    printf("Path length: %d\n", result->length);
+    printf("Total weight: %.2f\n", result->total_weight);
+
+    // Print path as JSON array of coordinates or show message if no path found
+    if (result->path != NULL && result->length > 0) {
+        printf("[");
+        for (int i = 0; i < result->length; i++) {
+            int node_idx = result->path[i];
+            printf("[%.6f,%.6f]", graph->nodes[node_idx].latitude, graph->nodes[node_idx].longitude);
+            if (i < result->length - 1) printf(",");
+        }
+        printf("]\n");
+    } else {
+        printf("[]\n");
     }
+
+    // Free resources
+    if (result->path) free(result->path);
+    free(result);
     free_graph(graph);
 
     return 0;
