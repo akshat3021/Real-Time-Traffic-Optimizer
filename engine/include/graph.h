@@ -4,31 +4,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct AdjListNode {
-    int dest;
-    int weight;
-    struct AdjListNode* next;
-} AdjListNode;
+typedef struct Edge {
+    int destination;
+    double weight;
+    struct Edge* next;
+} Edge;
 
-typedef struct AdjList {
-    AdjListNode* head; 
-} AdjList;
+typedef struct Node {
+    int id;
+    double latitude;
+    double longitude;
+    Edge* head; 
+} Node;
 
 typedef struct Graph {
-    int V;
-    AdjList* array;
+    int num_nodes;
+    Node* nodes; 
 } Graph;
 
-AdjListNode* newAdjListNode(int dest, int weight);
+Graph* load_graph(const char* junctions_file, const char* edges_file);
 
-Graph* createGraph(int V);
+void print_graph(Graph* graph);
 
-void addEdge(Graph* graph, int src, int dest, int weight);
+void free_graph(Graph* graph);
 
-Graph* loadGraphFromFile(const char* filename, int numVertices);
-
-void freeGraph(Graph* graph);
-
-void printGraph(Graph* graph);
-
-#endif // GRAPH_H
+#endif 
