@@ -3,12 +3,6 @@
 #include "graph.h"
 #include "algorithm.h"
 
-// Placeholder for traffic simulation (you can extend this later)
-void simulate_traffic(Graph* graph) {
-    // For now, no traffic updates, just a placeholder
-    printf("Note: Traffic simulation not yet implemented.\n");
-}
-
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         fprintf(stderr, "Usage: %s <source_id> <destination_id>\n", argv[0]);
@@ -18,56 +12,39 @@ int main(int argc, char *argv[]) {
     int src_id = atoi(argv[1]);
     int dest_id = atoi(argv[2]);
 
-    if (src_id <= 0 || dest_id <= 0) {
-        fprintf(stderr, "Source and destination IDs must be positive integers.\n");
-        return 1;
-    }
-
-    // Load graph (Module 1)
-    Graph* graph = load_graph("junctions.csv", "edges.csv");
+    Graph* graph = load_graph("engine/junctions.csv", "engine/edges.csv");
     if (graph == NULL) {
-        fprintf(stderr, "Error loading graph data.\n");
+        printf("{\"error\":\"Failed to load graph data.\",\"path\":[],\"total_weight\":-1}");
         return 1;
     }
 
-    printf("Graph loaded successfully with %d junctions.\n", graph->num_nodes);
+    int src_idx = src_id - 1;
+    int dest_idx = dest_id - 1;
 
-    // Print the graph adjacency for debugging
-    print_graph(graph);
-
-    // Simulate traffic (update edge weights if needed)
-    simulate_traffic(graph);
-
-    // Find shortest path (Module 2)
-    PathResult* result = dijkstra(graph, src_id - 1, dest_id - 1);
-
-    // Debug: Check if the path result is valid
-    if (result == NULL) {
-        fprintf(stderr, "Error: Dijkstra algorithm failed.\n");
-        free_graph(graph);
-        return 1;
+    if (src_idx < 0 || src_idx >= graph->num_nodes || dest_idx < 0 || dest_idx >= graph->num_nodes) {
+         printf("{\"error\":\"Invalid location ID.\",\"path\":[],\"total_weight\":-1}");
+         free_graph(graph);
+         return 1;
     }
 
-    // Debug: Print the path length and total weight
-    printf("Path length: %d\n", result->length);
-    printf("Total weight: %.2f\n", result->total_weight);
-
-    // Print path as JSON array of coordinates or show message if no path found
-    if (result->path != NULL && result->length > 0) {
-        printf("[");
+    PathResult* result = dijkstra(graph, src_idx, dest_idx);
+    
+    if (result != NULL && result->path != NULL && result->length > 0) {
+        printf("{\"path\":[");
         for (int i = 0; i < result->length; i++) {
-            int node_idx = result->path[i];
+            int node_idx = result->path[i]; 
             printf("[%.6f,%.6f]", graph->nodes[node_idx].latitude, graph->nodes[node_idx].longitude);
             if (i < result->length - 1) printf(",");
         }
-        printf("]\n");
+        printf("],\"total_weight\":%.2f}", result->total_weight);
     } else {
-        printf("[]\n");
+        printf("{\"error\":\"No route could be found between these locations.\",\"path\":[],\"total_weight\":-1}");
     }
 
-    // Free resources
-    if (result->path) free(result->path);
-    free(result);
+    if (result) {
+        if (result->path) free(result->path);
+        free(result);
+    }
     free_graph(graph);
 
     return 0;
