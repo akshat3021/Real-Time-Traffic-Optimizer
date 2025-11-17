@@ -21,12 +21,11 @@ Graph* load_graph(const char* junctions_file, const char* edges_file) {
     FILE* fp_edges = fopen(edges_file, "r");
 
     if (!fp_junctions || !fp_edges) {
-        fprintf(stderr, "Error: Could not open data files.\n");
-        if (fp_junctions) fclose(fp_junctions);
-        if (fp_edges) fclose(fp_edges);
+        printf("Error: Could not open data files.\n");
         return NULL;
     }
 
+    // --- Step 1: Read junctions and create nodes ---
     int num_nodes = count_lines(fp_junctions);
     if (num_nodes == 0) {
         fprintf(stderr, "Error: Junctions file is empty.\n");
@@ -63,6 +62,7 @@ Graph* load_graph(const char* junctions_file, const char* edges_file) {
     }
     fclose(fp_junctions);
 
+    // --- Step 2: Read edges and build connections ---
     fgets(buffer, MAX_LINE_LEN, fp_edges); // Skip header
 
     int from_id, to_id;
@@ -99,8 +99,22 @@ Graph* load_graph(const char* junctions_file, const char* edges_file) {
         }
     }
     fclose(fp_edges);
-
     return graph;
+}
+
+// Mohit's printGraph function, slightly adapted
+void print_graph(Graph* graph) {
+    printf("\n--- Graph Adjacency List ---\n");
+    for (int v = 0; v < graph->num_nodes; ++v) {
+        Edge* edge = graph->nodes[v].head;
+        printf("Junction [%d] (%.4f, %.4f):", graph->nodes[v].id, graph->nodes[v].latitude, graph->nodes[v].longitude);
+        while (edge) {
+            printf(" -> %d (time: %.1f)", edge->destination, edge->weight);
+            edge = edge->next;
+        }
+        printf("\n");
+    }
+    printf("--------------------------\n");
 }
 
 void free_graph(Graph* graph) {
@@ -115,4 +129,5 @@ void free_graph(Graph* graph) {
     }
     free(graph->nodes);
     free(graph);
+    printf("Graph memory freed successfully.\n");
 }

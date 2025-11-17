@@ -14,15 +14,18 @@ typedef struct Node {
     int id;
     double latitude;
     double longitude;
-    Edge* head;
+    Edge* head; 
 } Node;
 
 typedef struct Graph {
     int num_nodes;
-    Node* nodes;
+    Node* nodes; 
 } Graph;
 
 Graph* load_graph(const char* junctions_file, const char* edges_file);
+
+void print_graph(Graph* graph);
+
 void free_graph(Graph* graph);
 
-#endif
+#endif 
