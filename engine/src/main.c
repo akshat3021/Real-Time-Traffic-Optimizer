@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "graph.h"
-#include "algorithm.h"
+#include "../include/graph.h"
+#include "../include/algorithm.h"
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
@@ -12,7 +12,8 @@ int main(int argc, char *argv[]) {
     int src_id = atoi(argv[1]);
     int dest_id = atoi(argv[2]);
 
-    Graph* graph = load_graph("engine/junctions.csv", "engine/edges.csv");
+    // This path is now correct because your files are in the engine folder
+    Graph* graph = load_graph("engine/junctions_detailed_fixed_dehradun.csv", "engine/edges_detailed_fixed_dehradun.csv");
     if (graph == NULL) {
         printf("{\"error\":\"Failed to load graph data.\",\"path\":[],\"total_weight\":-1}");
         return 1;
@@ -22,7 +23,7 @@ int main(int argc, char *argv[]) {
     int dest_idx = dest_id - 1;
 
     if (src_idx < 0 || src_idx >= graph->num_nodes || dest_idx < 0 || dest_idx >= graph->num_nodes) {
-         printf("{\"error\":\"Invalid location ID.\",\"path\":[],\"total_weight\":-1}");
+         printf("{\"error\":\"Invalid location ID (must be between 1 and %d).\",\"path\":[],\"total_weight\":-1}", graph->num_nodes);
          free_graph(graph);
          return 1;
     }

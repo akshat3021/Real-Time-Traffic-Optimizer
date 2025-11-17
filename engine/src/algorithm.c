@@ -1,4 +1,4 @@
-#include "algorithm.h"
+#include "../include/algorithm.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -83,17 +83,17 @@ PathResult* dijkstra(Graph* graph, int src_idx, int dest_idx) {
 
     while (!isEmpty(minHeap)) {
         MinHeapNode* minHeapNode = extractMin(minHeap);
-        int u_idx = minHeapNode->v;
+        int u_idx = minHeapNode->v; 
 
         Edge* pCrawl = graph->nodes[u_idx].head;
         while (pCrawl != NULL) {
             int v_id = pCrawl->destination;
-            int v_idx = v_id - 1; 
+            int v_idx = v_id - 1;         
 
             if (v_idx >= 0 && v_idx < V) {
                 if (isInMinHeap(minHeap, v_idx) && dist[u_idx] != INT_MAX && pCrawl->weight + dist[u_idx] < dist[v_idx]) {
                     dist[v_idx] = dist[u_idx] + pCrawl->weight;
-                    parent[v_idx] = u_idx;
+                    parent[v_idx] = u_idx; 
                     decreaseKey(minHeap, v_idx, dist[v_idx]);
                 }
             }

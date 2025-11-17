@@ -15,9 +15,9 @@ def find_route():
     end_node = data['end']
 
     try:
-        if os.name == 'nt': 
+        if os.name == 'nt':
             executable_path = 'engine\\optimizer.exe'
-        else: 
+        else:
             executable_path = 'engine/optimizer'
 
         command = [executable_path, start_node, end_node]
