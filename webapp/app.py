@@ -1,36 +1,41 @@
 from flask import Flask, render_template, request
-import subprocess 
+import subprocess
+import os
 
 app = Flask(__name__)
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/')
 def index():
-    result = None
-    if request.method == 'POST':
-        source = request.form.get('source')
-        destination = request.form.get('destination')
+    return render_template('index.html')
 
+@app.route('/find_route', methods=['POST'])
+def find_route():
+    data = request.get_json()
+    start_node = data['start']
+    end_node = data['end']
+
+    try:
+        if os.name == 'nt':
+            executable_path = 'engine\\optimizer.exe'
+        else:
+            executable_path = 'engine/optimizer'
+
+        command = [executable_path, start_node, end_node]
         
-        try:
-            # 
-            command = ['engine\\fake_optimizer', source, destination]
-            
-            process = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                check=True 
-            )
-            result = process.stdout 
-        except FileNotFoundError:
-            result = "Error: The 'fake_optimizer' program was not found. Have you compiled it?"
-        except subprocess.CalledProcessError as e:
-            result = f"The C program failed with an error: {e.stderr}"
-        except Exception as e:
-            result = f"An unknown error occurred: {e}"
-
-
-    return render_template('index.html', result=result)
+        process = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return process.stdout
+        
+    except FileNotFoundError:
+        return "{\"error\":\"Optimizer executable not found. Please compile the C code.\"}", 500
+    except subprocess.CalledProcessError as e:
+        return e.output, 500
+    except Exception as e:
+        return f"{{\"error\":\"An unknown server error occurred: {str(e)}\"}}", 500
 
 if __name__ == '__main__':
     app.run(debug=True)

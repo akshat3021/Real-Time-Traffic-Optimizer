@@ -1,106 +1,133 @@
-#include "graph.h"
+#include "../include/graph.h"
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 
-AdjListNode* newAdjListNode(int dest, int weight) {
-    AdjListNode* newNode = (AdjListNode*)malloc(sizeof(AdjListNode));
-    if (!newNode) {
-        perror("Memory allocation failed for AdjListNode");
-        exit(EXIT_FAILURE);
+#define MAX_LINE_LEN 512 // Increased buffer size for long place names
+
+int count_lines(FILE* fp) {
+    int count = 0;
+    char buffer[MAX_LINE_LEN];
+    if (fgets(buffer, MAX_LINE_LEN, fp) == NULL) return 0; // Skip header
+    while (fgets(buffer, MAX_LINE_LEN, fp) != NULL) {
+        count++;
     }
-    newNode->dest = dest;
-    newNode->weight = weight;
-    newNode->next = NULL;
-    return newNode;
+    rewind(fp);
+    return count;
 }
 
-Graph* createGraph(int V) {
-    Graph* graph = (Graph*)malloc(sizeof(Graph));
-    if (!graph) {
-        perror("Memory allocation failed for Graph");
-        exit(EXIT_FAILURE);
-    }
-    graph->V = V;
+Graph* load_graph(const char* junctions_file, const char* edges_file) {
+    FILE* fp_junctions = fopen(junctions_file, "r");
+    FILE* fp_edges = fopen(edges_file, "r");
 
-    graph->array = (AdjList*)malloc(V * sizeof(AdjList));
-    if (!graph->array) {
-        perror("Memory allocation failed for adjacency list array");
-        free(graph);
-        exit(EXIT_FAILURE);
-    }
-
-    for (int i = 0; i < V; ++i) {
-        graph->array[i].head = NULL;
-    }
-
-    return graph;
-}
-
-void addEdge(Graph* graph, int src, int dest, int weight) {
-    AdjListNode* newNode = newAdjListNode(dest, weight);
-    newNode->next = graph->array[src].head;
-    graph->array[src].head = newNode;
-}
-
-Graph* loadGraphFromFile(const char* filename, int numVertices) {
-    FILE* file = fopen(filename, "r");
-    if (!file) {
-        perror("Error opening file");
+    if (!fp_junctions || !fp_edges) {
+        printf("Error: Could not open data files.\n");
         return NULL;
     }
 
-    Graph* graph = createGraph(numVertices);
-    char line[100];
-    int src, dest, weight;
-
-    while (fgets(line, sizeof(line), file)) {
-        if (line[0] == '\n' || line[0] == '#') {
-            continue;
-        }
-
-        if (sscanf(line, "%d %d %d", &src, &dest, &weight) == 3) {
-            if (src >= numVertices || dest >= numVertices || src < 0 || dest < 0) {
-                fprintf(stderr, "Warning: Vertex out of bounds in line: %s", line);
-                continue;
-            }
-            addEdge(graph, src, dest, weight);
-            addEdge(graph, dest, src, weight);
-        }
+    // --- Step 1: Read junctions and create nodes ---
+    int num_nodes = count_lines(fp_junctions);
+    if (num_nodes == 0) {
+        fprintf(stderr, "Error: Junctions file is empty.\n");
+        return NULL;
     }
 
-    fclose(file);
-    printf("Graph loaded successfully from %s.\n", filename);
+    Graph* graph = (Graph*)malloc(sizeof(Graph));
+    graph->num_nodes = num_nodes;
+    graph->nodes = (Node*)malloc(num_nodes * sizeof(Node));
+    
+    char buffer[MAX_LINE_LEN];
+    fgets(buffer, MAX_LINE_LEN, fp_junctions); // Skip header
+
+    for (int i = 0; i < num_nodes; i++) {
+        if (fgets(buffer, MAX_LINE_LEN, fp_junctions) == NULL) {
+             fprintf(stderr, "Error reading junction file at line %d\n", i+2);
+             free_graph(graph);
+             return NULL;
+        }
+        
+        char* token;
+        token = strtok(buffer, ",");
+        if (token) graph->nodes[i].id = atoi(token);
+        
+        token = strtok(NULL, ","); // Skip place_name
+        
+        token = strtok(NULL, ",");
+        if (token) graph->nodes[i].latitude = atof(token);
+        
+        token = strtok(NULL, "\n");
+        if (token) graph->nodes[i].longitude = atof(token);
+        
+        graph->nodes[i].head = NULL;
+    }
+    fclose(fp_junctions);
+
+    // --- Step 2: Read edges and build connections ---
+    fgets(buffer, MAX_LINE_LEN, fp_edges); // Skip header
+
+    int from_id, to_id;
+    double travel_time;
+    
+    while (fgets(buffer, MAX_LINE_LEN, fp_edges) != NULL) {
+        char* token;
+        token = strtok(buffer, ",");
+        if (token) from_id = atoi(token);
+        
+        token = strtok(NULL, ",");
+        if (token) to_id = atoi(token);
+        
+        token = strtok(NULL, ","); // Skip distance_km
+        
+        token = strtok(NULL, "\n");
+        if (token) travel_time = atof(token);
+        
+        int from_idx = from_id - 1; 
+        int to_idx = to_id - 1;
+
+        if (from_idx >= 0 && from_idx < num_nodes && to_idx >= 0 && to_idx < num_nodes) {
+            Edge* edge1 = (Edge*)malloc(sizeof(Edge));
+            edge1->destination = to_id; 
+            edge1->weight = travel_time; 
+            edge1->next = graph->nodes[from_idx].head;
+            graph->nodes[from_idx].head = edge1;
+
+            Edge* edge2 = (Edge*)malloc(sizeof(Edge));
+            edge2->destination = from_id; 
+            edge2->weight = travel_time;
+            edge2->next = graph->nodes[to_idx].head;
+            graph->nodes[to_idx].head = edge2;
+        }
+    }
+    fclose(fp_edges);
     return graph;
 }
-void printGraph(Graph* graph) {
+
+// Mohit's printGraph function, slightly adapted
+void print_graph(Graph* graph) {
     printf("\n--- Graph Adjacency List ---\n");
-    for (int v = 0; v < graph->V; ++v) {
-        AdjListNode* node = graph->array[v].head;
-        printf("Location [%d]:", v);
-        if (!node) {
-            printf(" (No connections)\n");
-        } else {
-            while (node) {
-                printf(" -> %d (time: %d mins)", node->dest, node->weight);
-                node = node->next;
-            }
-            printf("\n");
+    for (int v = 0; v < graph->num_nodes; ++v) {
+        Edge* edge = graph->nodes[v].head;
+        printf("Junction [%d] (%.4f, %.4f):", graph->nodes[v].id, graph->nodes[v].latitude, graph->nodes[v].longitude);
+        while (edge) {
+            printf(" -> %d (time: %.1f)", edge->destination, edge->weight);
+            edge = edge->next;
         }
+        printf("\n");
     }
     printf("--------------------------\n");
 }
 
-void freeGraph(Graph* graph) {
+void free_graph(Graph* graph) {
     if (!graph) return;
-
-    for (int i = 0; i < graph->V; ++i) {
-        AdjListNode* current = graph->array[i].head;
+    for (int i = 0; i < graph->num_nodes; ++i) {
+        Edge* current = graph->nodes[i].head;
         while (current != NULL) {
-            AdjListNode* temp = current;
+            Edge* temp = current;
             current = current->next;
             free(temp);
         }
     }
-    free(graph->array);
+    free(graph->nodes);
     free(graph);
     printf("Graph memory freed successfully.\n");
 }
