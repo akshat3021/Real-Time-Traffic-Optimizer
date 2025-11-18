@@ -12,15 +12,16 @@
         body { font-family: 'Poppins', sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; display: flex; flex-direction: column; height: 100vh; }
         header { background-color: #ffffff; color: #333; text-align: center; padding: 15px; font-size: 1.5em; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 1000; }
         .container { display: flex; flex-grow: 1; }
-        .sidebar { width: 350px; background-color: #ffffff; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow-y: auto; }
+        .sidebar { width: 350px; background-color: #ffffff; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow-y: auto; z-index: 500;}
         .sidebar h2 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; font-size: 1.2em; }
         .info-box { background-color: #e9f5ff; border-left: 5px solid #1a73e8; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+        .error-box { background-color: #fff0f0; border-left: 5px solid #d93025; color: #c5221f; padding: 15px; margin-bottom: 20px; border-radius: 5px; display: none; }
         .result-item, .control-item { font-size: 1.1em; margin-bottom: 15px; }
         select, #search-bar { width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-family: 'Poppins', sans-serif; box-sizing: border-box; }
         #search-btn { width: 100%; padding: 10px; background-color: #1a73e8; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; margin-top: 5px; }
         #clear-btn { margin-top: auto; padding: 12px; font-size: 1em; font-weight: 500; background-color: #d93025; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s ease; }
         #clear-btn:hover { background-color: #c5221f; }
-        #map { flex-grow: 1; height: 100%; }
+        #map { flex-grow: 1; height: 100%; z-index: 10; }
     </style>
 </head>
 <body>
@@ -37,27 +38,25 @@
 
             <hr>
 
-            <div class="info-box" id="instructions">Select a starting point and destination.</div>
+            <div class="info-box" id="instructions">Loading 600+ locations...</div>
+            <div class="error-box" id="error-box"></div>
             <div class="control-item">
                 <label for="start-select"><strong>📍 Start:</strong></label>
-                <select id="start-select"><option value="">Choose a starting point...</option></select>
+                <select id="start-select"><option value="">Loading...</option></select>
             </div>
             <div class="control-item">
                 <label for="end-select"><strong>🏁 End:</strong></label>
-                <select id="end-select"><option value="">Choose a destination...</option></select>
+                <select id="end-select"><option value="">Loading...</option></select>
             </div>
             <hr>
             <div class="result-item"><strong>⏱️ Total Time (minutes):</strong> <span id="total-time">---</span></div>
-            <div class="result-item"><strong>🗺️ Distance (km):</strong> <span id="total-distance">---</span></div>
+          
             <button id="clear-btn">Clear Route</button>
         </aside>
         <main id="map"></main>
     </div>
 
-     <script src="/static/locations.js"></script>
-
     <script>
-
         const map = L.map('map').setView([30.325, 78.025], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
@@ -67,18 +66,41 @@
         const searchBtn = document.getElementById('search-btn');
         const clearBtn = document.getElementById('clear-btn');
         const instructions = document.getElementById('instructions');
+        const errorBox = document.getElementById('error-box');
         const totalTimeEl = document.getElementById('total-time');
-        const totalDistanceEl = document.getElementById('total-distance');
 
         let routeLayer = null;
         let startMarker = null;
         let endMarker = null;
-
-        // Populate dropdowns
+        let locations = {}; 
+        async function loadLocations() {
+            try {
+                const response = await fetch('/get_locations');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch locations from server.');
+                }
+                
+                locations = await response.json();
+                
+                if (locations.error) {
+                    throw new Error(locations.error);
+                }
+                
+                populateDropdowns();
+                showInfo('Locations loaded. Select a start and end point.');
+                
+            } catch (err) {
+                showError('CRITICAL: ' - err.message);
+            }
+        }
         function populateDropdowns() {
+            startSelect.innerHTML = '<option value="">Choose a starting point...</option>';
+            endSelect.innerHTML = '<option value="">Choose a destination...</option>';
+            
             const entries = Object.entries(locations);
-            // sort by numeric id
+           
             entries.sort((a,b)=> Number(a[0]) - Number(b[0]));
+            
             for (const [id, info] of entries) {
                 const opt1 = document.createElement('option');
                 opt1.value = id;
@@ -91,62 +113,46 @@
                 endSelect.appendChild(opt2);
             }
         }
-
-        // Haversine distance in km
-        function haversineKm(lat1, lon1, lat2, lon2) {
-            const toRad = v => v * Math.PI / 180;
-            const R = 6371; // km
-            const dLat = toRad(lat2 - lat1);
-            const dLon = toRad(lon2 - lon1);
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c;
+        
+        function showInfo(message) {
+             instructions.style.display = 'block';
+             errorBox.style.display = 'none';
+             instructions.textContent = message;
+        }
+        
+        function showError(message) {
+             instructions.style.display = 'none';
+             errorBox.style.display = 'block';
+             errorBox.textContent = "Error: " + message;
         }
 
-        // Draw route from array of [lat, lon]
         function drawRoute(pathCoords) {
-            clearRoute();
+            clearRoute(); 
 
             if (!pathCoords || pathCoords.length === 0) {
-                instructions.textContent = 'No route returned by the engine.';
+                showError('No route returned by the engine.');
                 return;
             }
 
             const latlngs = pathCoords.map(p => [p[0], p[1]]);
-            routeLayer = L.polyline(latlngs, {weight: 5, opacity: 0.85}).addTo(map);
+            routeLayer = L.polyline(latlngs, {weight: 5, opacity: 0.85, color: '#00bfa5'}).addTo(map);
             map.fitBounds(routeLayer.getBounds(), {padding: [40,40]});
 
-            // start & end markers
             const start = latlngs[0];
             const end = latlngs[latlngs.length - 1];
             startMarker = L.marker(start).addTo(map).bindPopup('Start').openPopup();
             endMarker = L.marker(end).addTo(map).bindPopup('End');
-
-            // compute distance
-            let totalKm = 0;
-            for (let i=1; i<latlngs.length; i++) {
-                totalKm += haversineKm(latlngs[i-1][0], latlngs[i-1][1], latlngs[i][0], latlngs[i][1]);
-            }
-            totalDistanceEl.textContent = totalKm.toFixed(3);
         }
 
         function clearRoute() {
-            if (routeLayer) {
-                map.removeLayer(routeLayer);
-                routeLayer = null;
-            }
+            if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
             if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
             if (endMarker) { map.removeLayer(endMarker); endMarker = null; }
             totalTimeEl.textContent = '---';
-            totalDistanceEl.textContent = '---';
-            instructions.textContent = 'Select a starting point and destination.';
+            showInfo('Select a starting point and destination.');
         }
-
-        // Call backend /find_route
         async function requestRoute(startId, endId) {
-            instructions.textContent = 'Requesting route from backend…';
+            showInfo('Requesting route from backend…');
             try {
                 const payload = { start: String(startId), end: String(endId) };
                 const res = await fetch('/find_route', {
@@ -155,61 +161,56 @@
                     body: JSON.stringify(payload)
                 });
 
-                const text = await res.text();
-                // backend returns JSON text (C prints JSON); try to parse
-                let data;
-                try {
-                    data = JSON.parse(text);
-                } catch (e) {
-                    // sometimes Flask returns plain string error
-                    instructions.textContent = 'Server returned invalid JSON: ' + text;
+                const data = await res.json();
+
+                if (!res.ok || data.error) {
+                    showError(data.error || 'An unknown error occurred.');
                     return;
                 }
 
-                if (data.error) {
-                    instructions.textContent = 'Error: ' + data.error;
-                    return;
-                }
-
-                // expected format: { "path": [ [lat,lon], ... ], "total_weight": <number> }
                 const path = data.path;
                 const total_weight = data.total_weight;
+                
+                if (!path || path.length === 0) {
+                    showError('No route could be found.');
+                    return;
+                }
+
                 drawRoute(path);
-                totalTimeEl.textContent = (typeof total_weight === 'number') ? total_weight.toFixed(2) : '---';
-                instructions.textContent = 'Route rendered from backend.';
+                totalTimeEl.textContent = (typeof total_weight === 'number') ? total_weight.toFixed(2) : 'N/A';
+                showInfo('Route found! (Includes simulated traffic)');
             } catch (err) {
-                instructions.textContent = 'Network/server error: ' + err.message;
+                showError('Network/server error: ' + err.message);
             }
         }
-
-        // Find nearest node / search helper (simple name match)
         function searchAndZoom(query) {
             query = query.trim().toLowerCase();
             if (!query) return;
             const entries = Object.entries(locations);
-            // search for substring in name
+            
             const match = entries.find(([id, info]) => {
                 const name = (info.name || info.place_name || '').toLowerCase();
-                return name.includes(query);
+                return (id === query || name.includes(query));
             });
+            
             if (match) {
                 const [id, info] = match;
                 const lat = info.latitude || info.lat;
                 const lon = info.longitude || info.lon;
                 if (lat && lon) {
                     map.setView([lat, lon], 16);
-                    L.popup().setLatLng([lat, lon]).setContent(`${id} — ${info.name || info.place_name || ''}`).openOn(map);
+                    L.popup().setLatLng([lat, lon]).setContent(`<b>${id} — ${info.name || info.place_name || ''}</b>`).openOn(map);
                 } else {
-                    instructions.textContent = 'Found matching name but no coordinates available.';
+                    showError('Found matching name but no coordinates available.');
                 }
             } else {
-                instructions.textContent = 'No match found for "' + query + '"';
+                showError('No match found for "' + query + '"');
             }
         }
 
-        // Hook up UI
         document.addEventListener('DOMContentLoaded', () => {
-            populateDropdowns();
+           
+            loadLocations();
 
             searchBtn.addEventListener('click', () => {
                 searchAndZoom(searchBar.value);
@@ -217,7 +218,6 @@
 
             clearBtn.addEventListener('click', clearRoute);
 
-            // on change (user selects start & end), request route
             function maybeRequest() {
                 const start = startSelect.value;
                 const end = endSelect.value;
@@ -225,7 +225,6 @@
                     requestRoute(start, end);
                 }
             }
-
             startSelect.addEventListener('change', maybeRequest);
             endSelect.addEventListener('change', maybeRequest);
         });
